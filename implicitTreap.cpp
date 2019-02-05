@@ -1,37 +1,46 @@
+#include <chrono>
 #include <iostream>
 #include <fstream>
-#include <vector>
-#include <chrono>
+#include <forward_list>
 #include <random>
+#include <vector>
 
 template <class T>
 struct node {
     T val;
     int y;
     int iL, iR, subCnt;
-    T subSum;
     node(T val, int y, int iL = -1, int iR = -1) {
         this->val = val;
         this->y = y;
         this->iL = iL;
         this->iR = iR;
         this->subCnt = 1;
-        this->subSum = val;
     }
 };
 template <class T>
 struct implicitTreap {
     std::vector<node<T>> nodes;
-
-    const static int ERROR = -1000000007;
+    std::forward_list<int> reservedNodes;
     int rootNode = -1;
+
     void update(int V) {
         nodes[V].subCnt = size(nodes[V].iL) + size(nodes[V].iR) + 1;
     }
     int newNode(T val, int y) {
-        node<T> tmp(val, y);
-        nodes.push_back(tmp);
-        return nodes.size() - 1;
+        int newIdx;
+        if (!reservedNodes.empty()) {
+            newIdx = reservedNodes.front();
+            reservedNodes.pop_front();
+            nodes[newIdx].iL = nodes[newIdx].iR = -1;
+            nodes[newIdx].y = y;
+            nodes[newIdx].val = val;
+        } else {
+            node<T> tmp(val, y);
+            nodes.push_back(tmp);
+            newIdx = nodes.size() - 1;
+        }
+        return newIdx;
     }
     int merge(int L, int R) {
         if (L == -1)
@@ -95,7 +104,11 @@ struct implicitTreap {
         split(rootNode, pos, L, R);
         split(R, 1, M, R);
         rootNode = merge(L, R);
-        return (M != -1);
+        if (M != -1) {
+            reservedNodes.push_front(M);
+            return true;
+        }
+        return false;
     }
     int size(int nIdx) {
         return (nIdx != -1 ? nodes[nIdx].subCnt : 0);
@@ -156,8 +169,8 @@ int e, v;
 mt19937 rng(chrono::steady_clock::now().time_since_epoch().count());
 
 long long int sq(long long int a) { return a * a; }
-int randInt() {
-    return uniform_int_distribution<int>(0, INT_MAX)(rng);
+int randInt(int L, int R) {
+    return uniform_int_distribution<int>(L, R)(rng);
 }
 int main(int argc, char** argv) {
     freopen("river.in", "r", stdin);
@@ -165,7 +178,7 @@ int main(int argc, char** argv) {
     cin >> n >> p;
     for(int i = 0; i < n; ++i) {
         cin >> a;
-        implTreap.insert(a, i, randInt());
+        implTreap.insert(a, i, randInt(0, INT_MAX));
         ans += (a * a);
     }
     cout << ans << '\n';
@@ -199,8 +212,8 @@ int main(int argc, char** argv) {
         } else {
             ans += sq((len + 1) / 2);
             ans += sq(len / 2);
-            implTreap.insert((len + 1) / 2, v + 1, randInt());
-            implTreap.insert(len / 2, v + 1, randInt());
+            implTreap.insert((len + 1) / 2, v + 1, randInt(0, INT_MAX));
+            implTreap.insert(len / 2, v + 1, randInt(0, INT_MAX));
         }
         implTreap.erase(v);
         cout << ans << '\n';
