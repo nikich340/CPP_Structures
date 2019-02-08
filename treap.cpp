@@ -1,36 +1,46 @@
+#include <chrono>
 #include <iostream>
+#include <fstream>
+#include <forward_list>
+#include <random>
 #include <vector>
 
 template <class T>
 struct node {
-    T x;
+    T val;
     int y;
     int iL, iR, subCnt;
-    T subSum;
-    node(T x, int y, int iL = -1, int iR = -1) {
-        this->x = x;
+    node(T val, int y, int iL = -1, int iR = -1) {
+        this->val = val;
         this->y = y;
         this->iL = iL;
         this->iR = iR;
         this->subCnt = 1;
-        this->subSum = x;
     }
 };
 template <class T>
 struct treap {
     std::vector<node<T>> nodes;
-    const static int ERROR = -1000000007;
+    std::forward_list<int> reservedNodes;
     int rootNode = -1;
+
     void update(int V) {
-        nodes[V].subCnt = (nodes[V].iL != -1 ? nodes[nodes[V].iL].subCnt : 0) +
-                        (nodes[V].iR != -1 ? nodes[nodes[V].iR].subCnt : 0) + 1;
-        nodes[V].subSum = (nodes[V].iL != -1 ? nodes[nodes[V].iL].subSum : 0) +
-                        (nodes[V].iR != -1 ? nodes[nodes[V].iR].subSum : 0) + nodes[V].x;
+        nodes[V].subCnt = size(nodes[V].iL) + size(nodes[V].iR) + 1;
     }
-    int newNode(T x, int y) {
-        node<T> tmp(x, y);
-        nodes.push_back(tmp);
-        return nodes.size() - 1;
+    int newNode(T val, int y) {
+        int newIdx;
+        if (!reservedNodes.empty()) {
+            newIdx = reservedNodes.front();
+            reservedNodes.pop_front();
+            nodes[newIdx].iL = nodes[newIdx].iR = -1;
+            nodes[newIdx].y = y;
+            nodes[newIdx].val = val;
+        } else {
+            node<T> tmp(val, y);
+            nodes.push_back(tmp);
+            newIdx = nodes.size() - 1;
+        }
+        return newIdx;
     }
     int merge(int L, int R) {
         if (L == -1)
@@ -47,18 +57,18 @@ struct treap {
             return R;
         }
     }
-    void split(int V, int x, int& L, int& R) {
+    void split(int V, T val, bool eq, int& L, int& R) {
         if (V == -1) {
             L = -1;
             R = -1;
             return;
         }
         int newV = -1;
-        if (nodes[V].x <= x) {
+        if ((eq && nodes[V].val <= val) || (!eq && nodes[V].val < val)) {
             if (nodes[V].iR == -1) {
                 R = -1;
             } else {
-                split(nodes[V].iR, x, newV, R);
+                split(nodes[V].iR, val, true, newV, R);
             }
             nodes[V].iR = newV;
             L = V;
@@ -67,88 +77,103 @@ struct treap {
             if (nodes[V].iL == -1) {
                 L = -1;
             } else {
-                split(nodes[V].iL, x, L, newV);
+                split(nodes[V].iL, val, true, L, newV);
             }
             nodes[V].iL = newV;
             R = V;
             update(R);
         }
     }
-    int insert(T x, int y) {
+    int insert(T val, int y) {
         if (!size()) {
-            rootNode = newNode(x, y);
+            rootNode = newNode(val, y);
         } else {
             int L, M, R;
-            split(rootNode, x - 1, L, R);
-            M = merge(L, newNode(x, y));
+            split(rootNode, val, false, L, R);
+            M = merge(L, newNode(val, y));
             rootNode = merge(M, R);
         }
         return rootNode;
     }
-    bool erase(T x) {
+    bool erase(T val) {
         if (!size()) {
             return false;
         }
         int L, M, R;
-        split(rootNode, x - 1, L, R);
-        split(R, x, M, R);
+        split(rootNode, val - 1, L, R);
+        split(R, val, M, R);
         rootNode = merge(L, R);
-        return (M != -1);
+        if (M != -1) {
+            reservedNodes.push_front(M);
+            return true;
+        }
+        return false;
     }
-    int size(int idx) {
-        return (idx != -1 ? nodes[idx].subCnt : 0);
+    int size(int nIdx) {
+        return (nIdx != -1 ? nodes[nIdx].subCnt : 0);
     }
     int size() {
         return size(rootNode);
     }
-    T at(int idx) {
-        if (idx > size()) {
-            printf("[at] out of range (size = %d, idx = %d)\n", size(), idx);
+    T at(int pos) {
+        return nodes[nodeIdx(pos)].val;
+    }
+    int nodeIdx(int pos) {
+        if (pos >= size() || pos < 0) {
+            printf("[nodeIdx] out of range (size = %d, pos = %d)\n", size(), pos);
             exit(0);
         }
         int V = rootNode;
         while (V != -1) {
             int cntL = size(nodes[V].iL);
             int cntR = size(nodes[V].iR);
-            if (cntL > idx) {
+            if (cntL > pos) {
                 V = nodes[V].iL;
-            } else if (cntL < idx) {
-                idx = idx - (cntL + 1);
+            } else if (cntL < pos) {
+                pos = pos - (cntL + 1);
                 V = nodes[V].iR;
             } else {
-                return nodes[V].x;
+                return V;
             }
         }
-        return ERROR;
+        printf("[nodeIdx] strange error\n");
+        exit(0);
     }
     void viewTreap() {
-        int idx = 0;
+        int nIdx = 0;
         if (size())
-            viewTreapDfs(rootNode, idx);
+            viewTreapDfs(rootNode, nIdx);
         else
             printf("[viewTreap] empty treap\n");
     }
-    void viewTreapDfs(int V, int& idx) {
+    void viewTreapDfs(int V, int& nIdx) {
         if (nodes[V].iL != -1) {
-            viewTreapDfs(nodes[V].iL, idx);
+            viewTreapDfs(nodes[V].iL, nIdx);
         }
-        printf("[viewTreap], at[%d] = {x = %d, y = %d, subCnt = %d}\n",
-               idx, nodes[V].x, nodes[V].y, nodes[V].subCnt);
-        ++idx;
+        printf("[viewTreap], at[%d] = {val = %d, y = %d, subCnt = %d}\n",
+               nIdx, nodes[V].val, nodes[V].y, nodes[V].subCnt);
+        ++nIdx;
         if (nodes[V].iR != -1) {
-            viewTreapDfs(nodes[V].iR, idx);
+            viewTreapDfs(nodes[V].iR, nIdx);
         }
     }
 };
 
-treap<int> trea;
+std::mt19937 rng(std::chrono::steady_clock::now().time_since_epoch().count());
+int randInt(int L, int R) {
+    return std::uniform_int_distribution<int>(L, R)(rng);
+}
+
+treap<int> tr;
 
 int main(int argc, char** argv) {
     int n;
     std::cin >> n;
-    for(int i = 1; i <= n; ++i) {
-        trea.insert(i, rand());
+    for (int i = 0; i < n; ++i) {
+        tr.insert(i, randInt(0, INT_MAX));
     }
-    std::cout << "Sum of all elements = " << trea.nodes[trea.rootNode].subSum << '\n';
+    for (int i = 0; i < n; ++i) {
+        std::cout << tr.at(i) << '\n';
+    }
     return 0;
 }
