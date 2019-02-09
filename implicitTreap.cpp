@@ -1,21 +1,21 @@
 #include <chrono>
-#include <iostream>
-#include <fstream>
 #include <forward_list>
 #include <random>
 #include <vector>
 
 template <class T>
 struct node {
-    T val;
-    int y;
-    int iL, iR, subCnt;
+    int y, iL, iR, iP, subCnt;
+    T val, add, sum;
     node(T val, int y, int iL = -1, int iR = -1) {
         this->val = val;
         this->y = y;
         this->iL = iL;
         this->iR = iR;
+        this->iP = -1;
         this->subCnt = 1;
+        this->sum = val;
+        this->add = T(0);
     }
 };
 template <class T>
@@ -25,7 +25,25 @@ struct implicitTreap {
     int rootNode = -1;
 
     void update(int V) {
-        nodes[V].subCnt = size(nodes[V].iL) + size(nodes[V].iR) + 1;
+        if (V == -1)
+            return;
+        int L = nodes[V].iL;
+        int R = nodes[V].iR;
+        nodes[V].subCnt = size(L) + size(R) + 1;
+        nodes[V].sum = nodes[V].val;
+        if (L != -1) {
+            nodes[V].sum += nodes[L].sum;
+            nodes[L].iP = V;
+        }
+        if (R != -1) {
+            nodes[V].sum += nodes[R].sum;
+            nodes[R].iP = V;
+        }
+    }
+    void updateAdd(int V, T addVal) {
+        if (V == -1)
+            return;
+        nodes[V].add += addVal;
     }
     int newNode(T val, int y) {
         int newIdx;
@@ -48,41 +66,62 @@ struct implicitTreap {
         if (R == -1)
             return L;
         if (nodes[L].y > nodes[R].y) {
+            nodes[L].val += nodes[L].add;
+            updateAdd(nodes[L].iL, nodes[L].add);
+            updateAdd(nodes[L].iR, nodes[L].add);
+            nodes[L].add = T(0);
+
             nodes[L].iR = merge(nodes[L].iR, R);
             update(L);
             return L;
         } else {
+            nodes[R].val += nodes[R].add;
+            updateAdd(nodes[R].iL, nodes[R].add);
+            updateAdd(nodes[R].iR, nodes[R].add);
+            nodes[R].add = T(0);
+
             nodes[R].iL = merge(L, nodes[R].iL);
             update(R);
             return R;
         }
     }
-    void split(int V, int pos, int& L, int& R) {
+    void split(int V, int pos, int& outL, int& outR) {
         if (V == -1) {
-            L = -1;
-            R = -1;
+            outL = -1;
+            outR = -1;
             return;
         }
         int newV = -1;
-        int leftSize = size(nodes[V].iL) + 1;
+        int L = nodes[V].iL;
+        int R = nodes[V].iR;
+        int leftSize = size(L) + 1;
+
         if (leftSize <= pos) {
-            if (nodes[V].iR == -1) {
-                R = -1;
+            if (R == -1) {
+                outR = -1;
             } else {
-                split(nodes[V].iR, pos - leftSize, newV, R);
+                nodes[V].val += nodes[V].add;
+                updateAdd(L, nodes[V].add);
+                updateAdd(R, nodes[V].add);
+                nodes[V].add = T(0);
+                split(R, pos - leftSize, newV, outR);
             }
             nodes[V].iR = newV;
-            L = V;
-            update(L);
+            outL = V;
+            update(V);
         } else {
-            if (nodes[V].iL == -1) {
-                L = -1;
+            if (L == -1) {
+                outL = -1;
             } else {
-                split(nodes[V].iL, pos, L, newV);
+                nodes[V].val += nodes[V].add;
+                updateAdd(L, nodes[V].add);
+                updateAdd(R, nodes[V].add);
+                nodes[V].add = T(0);
+                split(L, pos, outL, newV);
             }
             nodes[V].iL = newV;
-            R = V;
-            update(R);
+            outR = V;
+            update(V);
         }
     }
     int insert(T val, int pos, int y) {
@@ -116,6 +155,53 @@ struct implicitTreap {
     int size() {
         return size(rootNode);
     }
+    T val(int nIdx) {
+        return (nIdx != -1 ? nodes[nIdx].val + nodes[nIdx].subCnt * nodes[nIdx].add : T(0));
+    }
+    T valueAt(int pos) {
+        return val(nodeIdx(pos));
+    }
+    T sumAt(int posL, int posR) {
+        if (posL > posR) {
+            printf("[sumAt] error (L > R)\n");
+            exit(0);
+        }
+        int L, M, R;
+        split(rootNode, posL, L, R);
+        split(R, posR - posL + 1, M, R);
+
+        T ret = nodes[M].sum;
+        rootNode = merge(merge(L, M), R);
+        return ret;
+    }
+    void addValue(int pos, T addVal) {
+        int V = nodeIdx(pos);
+        nodes[V].val += addVal;
+        while (V != -1) {
+            update(V);
+            V = nodes[V].iP;
+        }
+    }
+    void addValue(int posL, int posR, T addVal) {
+        if (posL > posR) {
+            printf("[sumAt] error (L > R)\n");
+            exit(0);
+        }
+        int L, M, R;
+        split(rootNode, posL, L, R);
+        split(R, posR - posL + 1, M, R);
+
+        nodes[M].add += addVal;
+        rootNode = merge(merge(L, M), R);
+    }
+    void setValue(int pos, T newVal) {
+        int V = nodeIdx(pos);
+        nodes[V].val = newVal;
+        while (V != -1) {
+            update(V);
+            V = nodes[V].iP;
+        }
+    }
     int nodeIdx(int pos) {
         if (pos >= size() || pos < 0) {
             printf("[nodeIdx] out of range (size = %d, pos = %d)\n", size(), pos);
@@ -137,86 +223,24 @@ struct implicitTreap {
         printf("[nodeIdx] strange error\n");
         exit(0);
     }
-    T& operator[](int pos) {
-        return nodes[nodeIdx(pos)].val;
-    }
-    void viewImplicitTreap() {
-        int nIdx = 0;
-        if (size())
-            viewImplicitTreapDfs(rootNode, nIdx);
+    void viewImplicitTreap(int V = -2) {
+        int idx = 0;
+        if (V == -2)
+            V = rootNode;
+        if (size(V))
+            viewImplicitTreapDfs(V, idx);
         else
-            printf("[viewImplicitTreap] empty implicitTreap\n");
+            printf("[view] empty implicitTreap\n");
     }
-    void viewImplicitTreapDfs(int V, int& nIdx) {
+    void viewImplicitTreapDfs(int V, int& idx) {
         if (nodes[V].iL != -1) {
-            viewImplicitTreapDfs(nodes[V].iL, nIdx);
+            viewImplicitTreapDfs(nodes[V].iL, idx);
         }
-        printf("[viewImplicitTreap], at[%d] = {val = %d, y = %d, subCnt = %d}\n",
-               nIdx, nodes[V].val, nodes[V].y, nodes[V].subCnt);
-        ++nIdx;
+        printf("[view], at[%d] = {val = %lld, y = %d, p = %d, subCnt = %d, sum = %lld}\n",
+               idx, nodes[V].val, nodes[V].y, nodes[V].iP, nodes[V].subCnt, nodes[V].sum);
+        ++idx;
         if (nodes[V].iR != -1) {
-            viewImplicitTreapDfs(nodes[V].iR, nIdx);
+            viewImplicitTreapDfs(nodes[V].iR, idx);
         }
     }
 };
-
-using namespace std;
-
-implicitTreap<long long int> implTreap;
-long long int ans = 0;
-int n, p, k, a;
-int e, v;
-mt19937 rng(chrono::steady_clock::now().time_since_epoch().count());
-
-long long int sq(long long int a) { return a * a; }
-int randInt(int L, int R) {
-    return uniform_int_distribution<int>(L, R)(rng);
-}
-int main(int argc, char** argv) {
-    freopen("river.in", "r", stdin);
-    freopen("river.out", "w", stdout);
-    cin >> n >> p;
-    for(int i = 0; i < n; ++i) {
-        cin >> a;
-        implTreap.insert(a, i, randInt(0, INT_MAX));
-        ans += (a * a);
-    }
-    cout << ans << '\n';
-    cin >> k;
-    for(int i = 0; i < k; ++i) {
-        cin >> e >> v;
-        --v;
-        long long int len = implTreap[v];
-        ans -= sq(len);
-        if (e == 1) {
-            if (v == 0) {
-                long long int& lnk = implTreap[1];
-                ans -= sq(lnk);
-                lnk += len;
-                ans += sq(lnk);
-            } else if (v == implTreap.size() - 1) {
-                long long int& lnk = implTreap[v - 1];
-                ans -= sq(lnk);
-                lnk += len;
-                ans += sq(lnk);
-            } else {
-                long long int& lnk1 = implTreap[v - 1];
-                long long int& lnk2 = implTreap[v + 1];
-                ans -= sq(lnk1);
-                ans -= sq(lnk2);
-                lnk1 += len / 2;
-                lnk2 += (len + 1) / 2;
-                ans += sq(lnk1);
-                ans += sq(lnk2);
-            }
-        } else {
-            ans += sq((len + 1) / 2);
-            ans += sq(len / 2);
-            implTreap.insert((len + 1) / 2, v + 1, randInt(0, INT_MAX));
-            implTreap.insert(len / 2, v + 1, randInt(0, INT_MAX));
-        }
-        implTreap.erase(v);
-        cout << ans << '\n';
-    }
-    return 0;
-}
