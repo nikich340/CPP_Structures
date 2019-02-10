@@ -3,6 +3,8 @@
 #include <random>
 #include <vector>
 
+#define PROTECTION 1
+
 template <class T>
 struct node {
     int y, iL, iR, iP, subCnt;
@@ -47,6 +49,12 @@ private:
         nodes[V].add += addVal;
         nodes[V].sum += nodes[V].subCnt * addVal;
     }
+    void pushAdd(int V) {
+        nodes[V].val += nodes[V].add;
+        updateAdd(nodes[V].iL, nodes[V].add);
+        updateAdd(nodes[V].iR, nodes[V].add);
+        nodes[V].add = T(0);
+    }
     int newNode(T val, int y) {
         int newIdx;
         if (!reservedNodes.empty()) {
@@ -68,20 +76,12 @@ private:
         if (R == -1)
             return L;
         if (nodes[L].y > nodes[R].y) {
-            nodes[L].val += nodes[L].add;
-            updateAdd(nodes[L].iL, nodes[L].add);
-            updateAdd(nodes[L].iR, nodes[L].add);
-            nodes[L].add = T(0);
-
+            pushAdd(L);
             nodes[L].iR = merge(nodes[L].iR, R);
             update(L);
             return L;
         } else {
-            nodes[R].val += nodes[R].add;
-            updateAdd(nodes[R].iL, nodes[R].add);
-            updateAdd(nodes[R].iR, nodes[R].add);
-            nodes[R].add = T(0);
-
+            pushAdd(R);
             nodes[R].iL = merge(L, nodes[R].iL);
             update(R);
             return R;
@@ -93,6 +93,7 @@ private:
             outR = -1;
             return;
         }
+        pushAdd(V);
         int newV = -1;
         int L = nodes[V].iL;
         int R = nodes[V].iR;
@@ -102,10 +103,6 @@ private:
             if (R == -1) {
                 outR = -1;
             } else {
-                nodes[V].val += nodes[V].add;
-                updateAdd(L, nodes[V].add);
-                updateAdd(R, nodes[V].add);
-                nodes[V].add = T(0);
                 split(R, pos - leftSize, newV, outR);
             }
             nodes[V].iR = newV;
@@ -115,10 +112,6 @@ private:
             if (L == -1) {
                 outL = -1;
             } else {
-                nodes[V].val += nodes[V].add;
-                updateAdd(L, nodes[V].add);
-                updateAdd(R, nodes[V].add);
-                nodes[V].add = T(0);
                 split(L, pos, outL, newV);
             }
             nodes[V].iL = newV;
@@ -133,10 +126,12 @@ private:
         return (nIdx != -1 ? (nodes[nIdx].val + nodes[nIdx].add) : T(0));
     }
     int nodeIdx(int pos) {
+#ifdef PROTECTION
         if (pos >= size() || pos < 0) {
             printf("[nodeIdx] out of range (size = %d, pos = %d)\n", size(), pos);
             exit(0);
         }
+#endif
         int V = rootNode;
         while (V != -1) {
             int cntL = size(nodes[V].iL);
@@ -150,7 +145,7 @@ private:
                 return V;
             }
         }
-        printf("[nodeIdx] strange error\n");
+        printf("[nodeIdx] node at pos %d was not found!\n", pos);
         exit(0);
     }
     void debugImplicitTreapDfs(int V, int& idx) {
@@ -165,21 +160,29 @@ private:
         }
     }
 public:
-    int insert(T val, int pos, int y) {
+    void insert(T val, int pos, int y) {
         if (!size()) {
             rootNode = newNode(val, y);
         } else {
-            int L, M, R;
+            int L, R;
             split(rootNode, pos, L, R);
-            M = merge(L, newNode(val, y));
-            rootNode = merge(M, R);
+            rootNode = merge(merge(L, newNode(val, y)), R);
         }
-        return rootNode;
+    }
+    void push_back(T val, int y) {
+        if (!size()) {
+            rootNode = newNode(val, y);
+        } else {
+            rootNode = merge(rootNode, newNode(val, y));
+        }
     }
     bool erase(int pos) {
-        if (!size()) {
-            return false;
+#ifdef PROTECTION
+        if (pos >= size() || pos < 0) {
+            printf("[erase] out of range (size = %d, pos = %d)\n", size(), pos);
+            exit(0);
         }
+#endif
         int L, M, R;
         split(rootNode, pos, L, R);
         split(R, 1, M, R);
@@ -236,6 +239,40 @@ public:
             update(V);
             V = nodes[V].iP;
         }
+    }
+    void move(int posL, int posR, int offset) {
+        if (!offset)
+            return;
+#ifdef PROTECTION
+        if (posR >= size() || posL < 0 || posR + offset >= size() || posL + offset < 0) {
+            printf("[move] out of range (size = %d, posL = %d, posR = %d, offset = %d)\n", size(), posL, posR, offset);
+            exit(0);
+        }
+#endif
+        int L, M1, M2, R;
+        split(rootNode, posL, L, R);
+        split(R, posR - posL + 1, M1, R);
+        if (offset > 0) {
+            split(R, offset, M2, R);
+            rootNode = merge(merge(L, M2), merge(M1, R));
+        } else {
+            split(L, size(L) + offset, L, M2);
+            rootNode = merge(merge(L, M1), merge(M2, R));
+        }
+    }
+    void move(int pos, int offset) {
+        move(pos, pos, offset);
+    }
+    void shift(int offset) {
+        offset = offset % size();
+        if (!offset)
+            return;
+        int L, R;
+        if (offset > 0)
+            split(rootNode, size() - offset, L, R);
+        else
+            split(rootNode, -offset, L, R);
+        rootNode = merge(R, L);
     }
     void debugImplicitTreap(int V = -2) {
         int idx = 0;

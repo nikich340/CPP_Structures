@@ -18,7 +18,7 @@
 #define mod 1000000007
 
 using namespace std;
-implicitTreap<long long int> implTreap;
+implicitTreap<long long int> iTreap;
 
 mt19937 rng(chrono::steady_clock::now().time_since_epoch().count());
 
@@ -26,5 +26,18 @@ int randInt(int L, int R) {
     return uniform_int_distribution<int>(L, R)(rng);
 }
 int main(int argc, char** argv) {
+    int n;
+    cin >> n;
+    upn(i, 0, n - 1) {
+        iTreap.push_back(i, randInt(0, INT_MAX));
+    }
+    int m;
+    cin >> m;
+    upn(j, 1, m) {
+        int K;
+        cin >> K;
+        iTreap.shift(K);
+        iTreap.debugImplicitTreap();
+    }
     return 0;
 }
