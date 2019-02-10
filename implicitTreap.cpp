@@ -20,6 +20,7 @@ struct node {
 };
 template <class T>
 struct implicitTreap {
+private:
     std::vector<node<T>> nodes;
     std::forward_list<int> reservedNodes;
     int rootNode = -1;
@@ -30,7 +31,7 @@ struct implicitTreap {
         int L = nodes[V].iL;
         int R = nodes[V].iR;
         nodes[V].subCnt = size(L) + size(R) + 1;
-        nodes[V].sum = nodes[V].val;
+        nodes[V].sum = nodes[V].val + nodes[V].add * nodes[V].subCnt;
         if (L != -1) {
             nodes[V].sum += nodes[L].sum;
             nodes[L].iP = V;
@@ -44,6 +45,7 @@ struct implicitTreap {
         if (V == -1)
             return;
         nodes[V].add += addVal;
+        nodes[V].sum += nodes[V].subCnt * addVal;
     }
     int newNode(T val, int y) {
         int newIdx;
@@ -124,6 +126,45 @@ struct implicitTreap {
             update(V);
         }
     }
+    int size(int nIdx) {
+        return (nIdx != -1 ? nodes[nIdx].subCnt : 0);
+    }
+    T val(int nIdx) {
+        return (nIdx != -1 ? (nodes[nIdx].val + nodes[nIdx].add) : T(0));
+    }
+    int nodeIdx(int pos) {
+        if (pos >= size() || pos < 0) {
+            printf("[nodeIdx] out of range (size = %d, pos = %d)\n", size(), pos);
+            exit(0);
+        }
+        int V = rootNode;
+        while (V != -1) {
+            int cntL = size(nodes[V].iL);
+            int cntR = size(nodes[V].iR);
+            if (cntL > pos) {
+                V = nodes[V].iL;
+            } else if (cntL < pos) {
+                pos = pos - (cntL + 1);
+                V = nodes[V].iR;
+            } else {
+                return V;
+            }
+        }
+        printf("[nodeIdx] strange error\n");
+        exit(0);
+    }
+    void debugImplicitTreapDfs(int V, int& idx) {
+        if (nodes[V].iL != -1) {
+            debugImplicitTreapDfs(nodes[V].iL, idx);
+        }
+        printf("[debug], at[%d] = {val = %d, add = %d, y = %d, p = %d, subCnt = %d, sum = %d}\n",
+               idx, nodes[V].val, nodes[V].add, nodes[V].y, nodes[V].iP, nodes[V].subCnt, nodes[V].sum);
+        ++idx;
+        if (nodes[V].iR != -1) {
+            debugImplicitTreapDfs(nodes[V].iR, idx);
+        }
+    }
+public:
     int insert(T val, int pos, int y) {
         if (!size()) {
             rootNode = newNode(val, y);
@@ -149,14 +190,8 @@ struct implicitTreap {
         }
         return false;
     }
-    int size(int nIdx) {
-        return (nIdx != -1 ? nodes[nIdx].subCnt : 0);
-    }
     int size() {
         return size(rootNode);
-    }
-    T val(int nIdx) {
-        return (nIdx != -1 ? nodes[nIdx].val + nodes[nIdx].subCnt * nodes[nIdx].add : T(0));
     }
     T valueAt(int pos) {
         return val(nodeIdx(pos));
@@ -191,7 +226,7 @@ struct implicitTreap {
         split(rootNode, posL, L, R);
         split(R, posR - posL + 1, M, R);
 
-        nodes[M].add += addVal;
+        updateAdd(M, addVal);
         rootNode = merge(merge(L, M), R);
     }
     void setValue(int pos, T newVal) {
@@ -202,45 +237,13 @@ struct implicitTreap {
             V = nodes[V].iP;
         }
     }
-    int nodeIdx(int pos) {
-        if (pos >= size() || pos < 0) {
-            printf("[nodeIdx] out of range (size = %d, pos = %d)\n", size(), pos);
-            exit(0);
-        }
-        int V = rootNode;
-        while (V != -1) {
-            int cntL = size(nodes[V].iL);
-            int cntR = size(nodes[V].iR);
-            if (cntL > pos) {
-                V = nodes[V].iL;
-            } else if (cntL < pos) {
-                pos = pos - (cntL + 1);
-                V = nodes[V].iR;
-            } else {
-                return V;
-            }
-        }
-        printf("[nodeIdx] strange error\n");
-        exit(0);
-    }
-    void viewImplicitTreap(int V = -2) {
+    void debugImplicitTreap(int V = -2) {
         int idx = 0;
         if (V == -2)
             V = rootNode;
         if (size(V))
-            viewImplicitTreapDfs(V, idx);
+            debugImplicitTreapDfs(V, idx);
         else
-            printf("[view] empty implicitTreap\n");
-    }
-    void viewImplicitTreapDfs(int V, int& idx) {
-        if (nodes[V].iL != -1) {
-            viewImplicitTreapDfs(nodes[V].iL, idx);
-        }
-        printf("[view], at[%d] = {val = %lld, y = %d, p = %d, subCnt = %d, sum = %lld}\n",
-               idx, nodes[V].val, nodes[V].y, nodes[V].iP, nodes[V].subCnt, nodes[V].sum);
-        ++idx;
-        if (nodes[V].iR != -1) {
-            viewImplicitTreapDfs(nodes[V].iR, idx);
-        }
+            printf("[debug] empty implicitTreap\n");
     }
 };

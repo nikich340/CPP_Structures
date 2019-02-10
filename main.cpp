@@ -26,8 +26,5 @@ int randInt(int L, int R) {
     return uniform_int_distribution<int>(L, R)(rng);
 }
 int main(int argc, char** argv) {
-    int n;
-    cin >> n;
-
     return 0;
 }
