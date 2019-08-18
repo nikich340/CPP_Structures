@@ -1,4 +1,7 @@
-#include <bits/stdc++.h>
+#include <chrono>
+#include <forward_list>
+#include <stdlib.h>
+#include <vector>
 
 #define PROTECTION 1
 
@@ -222,47 +225,13 @@ public:
             split(rootNode, -offset, L, R);
         rootNode = merge(R, L);
     }
+    void debugImplicitTreap(int V = -2) {
+        int idx = 0;
+        if (V == -2)
+            V = rootNode;
+        if (size(V))
+            debugImplicitTreapDfs(V, idx);
+        else
+            printf("[debug] empty implicitTreap\n");
+    }
 };
-
-#define ll long long
-#define ld long double
-#define X first
-#define Y second
-#define upn(x, init, n) for (int x = init; x <= n; ++x)
-#define upiter(x, container) for (auto x = container.begin(); x != container.end(); ++x)
-#define dn(x, init, n) for(int x = init; x >= n; --x)
-#define diter(x, container) for (auto x = container.rbegin(); x != container.rend(); ++x)
-#define pb push_back
-#define pii pair<int, int>
-#define el '\n'
-#define sfio() freopen("input.txt", "r", stdin); freopen("output.txt", "w", stdout);
-#define PI acos(-1.0)
-#define eps 0.0000001
-#define mod 1000000007
-
-using namespace std;
-implicitTreap<int> iTreap;
-
-mt19937 rng(chrono::steady_clock::now().time_since_epoch().count());
-
-int randInt(int L, int R) {
-    return uniform_int_distribution<int>(L, R)(rng);
-}
-int main(int argc, char** argv) {
-    int n;
-    cin >> n;
-    upn(i, 0, n - 1) {
-        iTreap.push_back(i, randInt(0, INT_MAX));
-    }
-    int m;
-    cin >> m;
-    upn(j, 1, m) {
-        int K;
-        cin >> K;
-        iTreap.shift(K);
-        upn(k, 0, iTreap.size() - 1) {
-            printf("iTreap[%d] = %d\n", k, iTreap.valueAt(k));
-        }
-    }
-    return 0;
-}
